@@ -14,16 +14,27 @@ const (
 	fpmToMps     = feetToMeters / 60
 )
 
+// lastFix is the most recent ADS-B position when the live lat/lon fields
+// have aged out of the feed. The global stream keeps sending the aircraft
+// this way instead of dropping it.
+type lastFix struct {
+	Lat *float64 `json:"lat"`
+	Lon *float64 `json:"lon"`
+}
+
 // patch is one aircraft object from a full snapshot or a sparse delta.
 type patch struct {
-	Hex      string          `json:"hex"`
-	Flight   *string         `json:"flight"`
-	Lat      *float64        `json:"lat"`
-	Lon      *float64        `json:"lon"`
-	AltBaro  json.RawMessage `json:"alt_baro"`
-	GS       *float64        `json:"gs"`
-	Track    *float64        `json:"track"`
-	BaroRate *float64        `json:"baro_rate"`
+	Hex          string          `json:"hex"`
+	Flight       *string         `json:"flight"`
+	Lat          *float64        `json:"lat"`
+	Lon          *float64        `json:"lon"`
+	LastPosition *lastFix        `json:"lastPosition"`
+	RRLat        *float64        `json:"rr_lat"`
+	RRLon        *float64        `json:"rr_lon"`
+	AltBaro      json.RawMessage `json:"alt_baro"`
+	GS           *float64        `json:"gs"`
+	Track        *float64        `json:"track"`
+	BaroRate     *float64        `json:"baro_rate"`
 }
 
 type track struct {
@@ -41,10 +52,13 @@ func (t *track) apply(p patch, now float64) bool {
 	if p.Flight != nil {
 		t.ac.Callsign = strings.TrimSpace(*p.Flight)
 	}
-	if p.Lat != nil && p.Lon != nil {
-		t.ac.Lat = *p.Lat
-		t.ac.Lon = *p.Lon
-		t.hasPos = true
+	if lat, lon, ok := positionOf(p); ok {
+		// A coarse rr_ estimate must not drag a real fix off its last point.
+		if p.Lat != nil || !t.hasPos || p.LastPosition != nil {
+			t.ac.Lat = lat
+			t.ac.Lon = lon
+			t.hasPos = true
+		}
 	}
 	ground := false
 	if alt, ok, isGround := parseAltBaro(p.AltBaro); isGround {
@@ -67,6 +81,21 @@ func (t *track) apply(p patch, now float64) bool {
 		t.ac.Time = now
 	}
 	return t.hasPos && !ground && t.ac.ICAO24 != ""
+}
+
+// positionOf prefers a live fix, then the last ADS-B fix, then the coarse
+// receiver estimate.
+func positionOf(p patch) (lat, lon float64, ok bool) {
+	if p.Lat != nil && p.Lon != nil {
+		return *p.Lat, *p.Lon, true
+	}
+	if p.LastPosition != nil && p.LastPosition.Lat != nil && p.LastPosition.Lon != nil {
+		return *p.LastPosition.Lat, *p.LastPosition.Lon, true
+	}
+	if p.RRLat != nil && p.RRLon != nil {
+		return *p.RRLat, *p.RRLon, true
+	}
+	return 0, 0, false
 }
 
 func parseAltBaro(raw json.RawMessage) (feet float64, ok bool, ground bool) {

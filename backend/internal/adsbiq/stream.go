@@ -170,18 +170,20 @@ func applyFrame(tracks map[string]*track, fr frame) Batch {
 			tracks[id] = tr
 		}
 	} else {
-		for _, raw := range fr.New {
-			changed, removed = upsert(tracks, raw, now, changed, removed)
-		}
-		for _, raw := range fr.Update {
-			changed, removed = upsert(tracks, raw, now, changed, removed)
-		}
+		// Removals first, then updates. A same-frame update that still carries
+		// lastPosition puts the aircraft back after a stale-position removal.
 		for _, id := range fr.Remove {
 			id = lowerHex(id)
 			if _, exists := tracks[id]; exists {
 				delete(tracks, id)
 				removed = append(removed, id)
 			}
+		}
+		for _, raw := range fr.New {
+			changed, removed = upsert(tracks, raw, now, changed, removed)
+		}
+		for _, raw := range fr.Update {
+			changed, removed = upsert(tracks, raw, now, changed, removed)
 		}
 	}
 
@@ -198,7 +200,7 @@ func upsert(tracks map[string]*track, raw json.RawMessage, now float64, changed 
 	_, existed := tracks[id]
 	ac, ok := mergeOne(tracks, raw, now)
 	if ok {
-		return append(changed, ac), removed
+		return append(changed, ac), dropID(removed, ac.ICAO24)
 	}
 	if existed && id != "" {
 		removed = append(removed, id)
@@ -224,6 +226,17 @@ func mergeOne(tracks map[string]*track, raw json.RawMessage, now float64) (opens
 	}
 	tracks[id] = tr
 	return tr.ac, true
+}
+
+func dropID(ids []string, id string) []string {
+	n := 0
+	for _, x := range ids {
+		if x != id {
+			ids[n] = x
+			n++
+		}
+	}
+	return ids[:n]
 }
 
 func hexOf(raw json.RawMessage) string {
