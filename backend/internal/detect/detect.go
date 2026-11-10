@@ -20,8 +20,8 @@ type State struct {
 type AlertKind string
 
 const (
-	KindHeading   AlertKind = "heading"
-	KindAltitude  AlertKind = "altitude"
+	KindHeading  AlertKind = "heading"
+	KindAltitude AlertKind = "altitude"
 )
 
 // Alert is a detected anomaly for an aircraft.
@@ -48,6 +48,11 @@ type History struct {
 
 func NewHistory() *History {
 	return &History{buf: make(map[string][]State)}
+}
+
+// Forget drops history for an aircraft that left the feed.
+func (h *History) Forget(icao24 string) {
+	delete(h.buf, icao24)
 }
 
 // Check compares current state to the last stored sample and returns any alerts.

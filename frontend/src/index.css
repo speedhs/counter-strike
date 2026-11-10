@@ -176,6 +176,143 @@ button {
   height: 100%;
 }
 
+.flight-filter {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 4;
+  width: min(22rem, calc(100% - 1.5rem));
+}
+
+.flight-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  text-align: left;
+}
+
+.flight-filter-btn.active {
+  border-color: var(--olive-dim);
+}
+
+.flight-filter-kicker {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.flight-filter-btn .mono {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.flight-filter-caret {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.flight-filter-panel {
+  margin-top: 0.35rem;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  max-height: min(24rem, calc(100vh - 8rem));
+}
+
+.flight-filter-search {
+  margin: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.flight-filter-search:focus {
+  outline: 1px solid var(--olive-dim);
+}
+
+.flight-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0 0.5rem 0.45rem;
+}
+
+.flight-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--olive-dim);
+  color: var(--olive);
+  font-size: 0.72rem;
+}
+
+.flight-filter-clear {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.15rem 0.35rem;
+}
+
+.flight-filter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+
+.flight-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.65rem;
+  cursor: pointer;
+}
+
+.flight-option:hover,
+.flight-option.checked {
+  background: rgba(158, 194, 122, 0.08);
+}
+
+.flight-option input {
+  accent-color: var(--olive);
+}
+
+.flight-option-call {
+  font-size: 0.8rem;
+}
+
+.flight-option-icao {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.flight-filter-empty,
+.flight-filter-foot {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.flight-filter-foot {
+  border-top: 1px solid var(--line);
+}
+
 .map-root .maplibregl-map,
 .map-root .maplibregl-canvas,
 .map-root .maplibregl-canvas-container {

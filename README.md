@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Tracks appear within one poll cycle (~15s). Default scope is **global** (worldwide OpenSky).
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Tracks appear with the first websocket snapshot (a few seconds). The default feed is the ADSBiq live stream, worldwide.
 
 ## API
 
@@ -41,19 +41,27 @@ Vite proxies `/api` and `/ws` to `localhost:8080`.
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `ADDR` | `:8080` | Listen address |
-| `POLL_INTERVAL` | `15s` | OpenSky poll interval (`15` or `15s`) |
-| `OPENSKY_SCOPE` | `global` | `global` = worldwide; `regional` = use bbox |
-| `BBOX_LAMIN` | `35.0` | South latitude (regional only) |
-| `BBOX_LOMIN` | `-80.0` | West longitude (regional only) |
-| `BBOX_LAMAX` | `42.0` | North latitude (regional only) |
-| `BBOX_LOMAX` | `-71.0` | East longitude (regional only) |
+| `FEED` | `adsbiq` | `adsbiq` = live `wss` stream; `opensky` = REST poll |
+| `ADSBIQ_URL` | `wss://api.adsbiq.com/ws/` | Upstream websocket |
+| `ADSBIQ_TOKEN` | | Optional feeder API key (faster tier) |
+| `ADSBIQ_LAT` / `ADSBIQ_LON` | | Set both for the 250 nm zone stream (~1s) |
+| `POLL_INTERVAL` | `15s` | OpenSky poll interval when `FEED=opensky` |
+| `OPENSKY_SCOPE` | `global` | `global` or `regional` (OpenSky only) |
+| `BBOX_LAMIN` | `35.0` | South latitude (OpenSky regional only) |
+| `BBOX_LOMIN` | `-80.0` | West longitude (OpenSky regional only) |
+| `BBOX_LAMAX` | `42.0` | North latitude (OpenSky regional only) |
+| `BBOX_LOMAX` | `-71.0` | East longitude (OpenSky regional only) |
 
-On HTTP 429 the server backs off up to 60s. Prefer a longer `POLL_INTERVAL` for global anonymous access.
-
-Regional example (US East Coast):
+Zone example (New York, higher update rate):
 
 ```bash
-OPENSKY_SCOPE=regional POLL_INTERVAL=10 go run ./cmd/server
+ADSBIQ_LAT=40.7 ADSBIQ_LON=-74.0 go run ./cmd/server
+```
+
+OpenSky fallback:
+
+```bash
+FEED=opensky OPENSKY_SCOPE=regional POLL_INTERVAL=10 go run ./cmd/server
 ```
 
 ## Anomaly rules

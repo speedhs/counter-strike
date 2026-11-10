@@ -37,7 +37,7 @@ export function StatusStrip({ conn, snapshot }: Props) {
           <span className="value mono">{snapshot.alert_count}</span>
         </div>
         <div className="metric">
-          <span className="label">Last poll</span>
+          <span className="label">Updated</span>
           <span className="value mono">{formatTime(snapshot.last_poll)}</span>
         </div>
         <div className="metric">

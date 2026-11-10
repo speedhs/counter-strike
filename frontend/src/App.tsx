@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertRail } from './AlertRail'
 import { DetailPanel } from './DetailPanel'
+import { FlightFilter } from './FlightFilter'
 import { MapView } from './MapView'
 import { StatusStrip } from './StatusStrip'
 import { useLiveData } from './useLiveData'
@@ -8,16 +9,51 @@ import { useLiveData } from './useLiveData'
 export default function App() {
   const { snapshot, conn, flashIcaos } = useLiveData()
   const [selected, setSelected] = useState<string | null>(null)
+  const [watched, setWatched] = useState<string[]>([])
+
+  const watchSet = useMemo(() => new Set(watched), [watched])
+  const monitoring = watchSet.size > 0
+
+  const visibleAircraft = useMemo(
+    () =>
+      monitoring
+        ? snapshot.aircraft.filter((ac) => watchSet.has(ac.icao24))
+        : snapshot.aircraft,
+    [snapshot.aircraft, monitoring, watchSet],
+  )
+
+  const visibleAlerts = useMemo(
+    () =>
+      monitoring
+        ? snapshot.alerts.filter((alert) => watchSet.has(alert.icao24))
+        : snapshot.alerts,
+    [snapshot.alerts, monitoring, watchSet],
+  )
+
+  const focusKey = useMemo(
+    () => (monitoring ? [...watched].sort().join(',') : ''),
+    [monitoring, watched],
+  )
+
+  useEffect(() => {
+    if (selected && monitoring && !watchSet.has(selected)) setSelected(null)
+  }, [selected, monitoring, watchSet])
 
   const selectedAircraft = useMemo(
-    () => snapshot.aircraft.find((a) => a.icao24 === selected) ?? null,
-    [snapshot.aircraft, selected],
+    () => visibleAircraft.find((a) => a.icao24 === selected) ?? null,
+    [visibleAircraft, selected],
   )
 
   const lastAlert = useMemo(
-    () => snapshot.alerts.find((a) => a.icao24 === selected),
-    [snapshot.alerts, selected],
+    () => visibleAlerts.find((a) => a.icao24 === selected),
+    [visibleAlerts, selected],
   )
+
+  const toggleWatch = (icao24: string) => {
+    setWatched((prev) =>
+      prev.includes(icao24) ? prev.filter((id) => id !== icao24) : [...prev, icao24],
+    )
+  }
 
   return (
     <div className="ops-shell">
@@ -25,10 +61,17 @@ export default function App() {
       <main className="ops-main">
         <div className="map-stage">
           <MapView
-            aircraft={snapshot.aircraft}
+            aircraft={visibleAircraft}
             flashIcaos={flashIcaos}
             selected={selected}
+            focusKey={focusKey}
             onSelect={setSelected}
+          />
+          <FlightFilter
+            aircraft={snapshot.aircraft}
+            watched={watched}
+            onToggle={toggleWatch}
+            onClear={() => setWatched([])}
           />
           <DetailPanel
             aircraft={selectedAircraft}
@@ -37,7 +80,7 @@ export default function App() {
           />
         </div>
         <AlertRail
-          alerts={snapshot.alerts}
+          alerts={visibleAlerts}
           selected={selected}
           onSelect={setSelected}
         />

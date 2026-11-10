@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/speed/counter-strike/backend/internal/adsbiq"
 	"github.com/speed/counter-strike/backend/internal/detect"
 	"github.com/speed/counter-strike/backend/internal/hub"
 	"github.com/speed/counter-strike/backend/internal/opensky"
@@ -24,14 +25,29 @@ func main() {
 	client := opensky.NewClient()
 	history := detect.NewHistory()
 
-	if bbox.Global {
-		log.Printf("opensky scope: global (worldwide)")
+	feed := env("FEED", "adsbiq")
+	if feed == "opensky" {
+		if bbox.Global {
+			log.Printf("feed: opensky poll every %s, scope global", interval)
+		} else {
+			log.Printf("feed: opensky poll every %s, bbox lamin=%.2f lomin=%.2f lamax=%.2f lomax=%.2f",
+				interval, bbox.Lamin, bbox.Lomin, bbox.Lamax, bbox.Lomax)
+		}
+		go pollLoop(client, bbox, interval, st, history, h)
 	} else {
-		log.Printf("opensky scope: bbox lamin=%.2f lomin=%.2f lamax=%.2f lomax=%.2f",
-			bbox.Lamin, bbox.Lomin, bbox.Lamax, bbox.Lomax)
+		cfg := adsbiq.Config{
+			URL:   env("ADSBIQ_URL", adsbiq.DefaultURL),
+			Token: os.Getenv("ADSBIQ_TOKEN"),
+			Lat:   os.Getenv("ADSBIQ_LAT"),
+			Lon:   os.Getenv("ADSBIQ_LON"),
+		}
+		if cfg.Lat != "" && cfg.Lon != "" {
+			log.Printf("feed: adsbiq wss zone lat=%s lon=%s", cfg.Lat, cfg.Lon)
+		} else {
+			log.Printf("feed: adsbiq wss global")
+		}
+		go streamLoop(adsbiq.New(cfg), st, history, h)
 	}
-
-	go pollLoop(client, bbox, interval, st, history, h)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +61,38 @@ func main() {
 	mux.HandleFunc("/ws", h.ServeWS)
 
 	handler := withCORS(mux)
-	log.Printf("ops server listening on %s (poll every %s)", addr, interval)
+	log.Printf("ops server listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, handler))
+}
+
+func streamLoop(client *adsbiq.Client, st *store.Store, history *detect.History, h *hub.Hub) {
+	client.Run(func(batch adsbiq.Batch) {
+		var newAlerts []detect.Alert
+		for _, ac := range batch.Changed {
+			newAlerts = append(newAlerts, history.Check(ac.ICAO24, detect.State{
+				Time:    ac.Time,
+				Alt:     ac.Alt,
+				Heading: ac.Heading,
+				VRate:   ac.VRate,
+			})...)
+		}
+		for _, id := range batch.Removed {
+			history.Forget(id)
+		}
+
+		st.UpdateAircraft(batch.Aircraft, true)
+		st.AddAlerts(newAlerts)
+
+		snap := st.Snapshot()
+		h.Broadcast(hub.Message{Type: "tick", Data: snap})
+		for _, a := range newAlerts {
+			h.Broadcast(hub.Message{Type: "alert", Data: a})
+		}
+		log.Printf("stream ok: %d aircraft, %d new alerts", len(batch.Aircraft), len(newAlerts))
+	}, func() {
+		st.SetLive(false)
+		h.Broadcast(hub.Message{Type: "tick", Data: st.Snapshot()})
+	})
 }
 
 func pollLoop(
